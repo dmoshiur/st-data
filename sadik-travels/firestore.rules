@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// Firestore is used to store the FUNDERS list.
+// Only signed-in (admin) users may read or write.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /funders/{funderId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Keep everything else locked down.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

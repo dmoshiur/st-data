@@ -1,0 +1,39 @@
+# Render Blueprint — deploy this folder as a free Static Site on Render.
+#
+# HOW TO USE
+# 1. Push this repository to GitHub.
+# 2. On Render: New -> "Blueprint" -> connect the repo.
+#    (or New -> "Static Site" and fill in the build/publish values below manually)
+# 3. Replace the placeholder envVar values below with your real Firebase config,
+#    then deploy.
+#
+# IMPORTANT: envVars are read by Vite AT BUILD TIME. After changing them,
+# trigger a new deploy (Render rebuilds the site).
+
+services:
+  - type: web
+    name: sadik-travels-donor-manager
+    runtime: static
+    rootDir: sadik-travels
+    buildCommand: npm install && npm run build
+    staticPublishPath: sadik-travels/dist
+    pullRequestPreviewsEnabled: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_FIREBASE_API_KEY
+        value: your-api-key
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        value: your-project.firebaseapp.com
+      - key: VITE_FIREBASE_DATABASE_URL
+        value: https://your-project-default-rtdb.firebaseio.com
+      - key: VITE_FIREBASE_PROJECT_ID
+        value: your-project-id
+      - key: VITE_FIREBASE_STORAGE_BUCKET
+        value: your-project.appspot.com
+      - key: VITE_FIREBASE_MESSAGING_SENDER_ID
+        value: "000000000000"
+      - key: VITE_FIREBASE_APP_ID
+        value: 1:000000000000:web:0000000000000000000000
