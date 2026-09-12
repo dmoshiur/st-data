@@ -1,0 +1,34 @@
+# Netlify build & redirect configuration.
+#
+# The frontend is a Vite SPA. It talks to the serverless backend through
+# /api/*, which we rewrite to the single `api` function. Environment
+# variables (TURSO_DB_URL, TURSO_DB_AUTH_TOKEN, JWT_SECRET, ADMIN_EMAIL,
+# ADMIN_PASSWORD) are read at RUNTIME by the function, so you can set them
+# in the Netlify dashboard → Site settings → Environment variables and
+# they take effect without a rebuild.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# SPA fallback — send every non-file path to index.html (except /api/*).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+  conditions = { Role = [] }
+
+# Send all /api/* requests to our single catch-all function.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+[dev]
+  framework = "vite"
+  # The Vite plugin already mounts the API during dev, so we don't tell
+  # Netlify Dev about any separate functions dir — avoids double-handling.
+  targetPort = 5173

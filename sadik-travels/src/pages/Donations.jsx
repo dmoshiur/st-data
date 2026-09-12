@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { db, collection, query, orderBy, onSnapshot } from '../store/firestore'
-import { rtdb, ref, onValue, update } from '../store/database'
-import { MONTHS, monthKey, formatCurrency, formatDateTime, yearRange } from '../utils'
+import { useEffect, useMemo, useState } from 'react'
+import { useFunders, useMonthDonations, mutations } from '../store/database'
+import { MONTHS, monthKey, formatCurrency, yearRange } from '../utils'
 
 export default function Donations() {
   const now = new Date()
@@ -9,9 +8,8 @@ export default function Donations() {
   const [monthIdx, setMonthIdx] = useState(now.getMonth()) // 0..11
   const month = monthKey(year, monthIdx + 1)
 
-  const [funders, setFunders] = useState([])
-  const [existing, setExisting] = useState({})
-  const [existingLoaded, setExistingLoaded] = useState(false)
+  const { data: funders = [], error: fe } = useFunders()
+  const { data: existing = [], error: de, loading: existingLoading } = useMonthDonations(month)
 
   // id -> boolean (checked) and id -> string (amount input)
   const [checked, setChecked] = useState({})
@@ -19,139 +17,76 @@ export default function Donations() {
 
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
+  const [localError, setLocalError] = useState('')
 
-  // 1) Load funders from Firestore (single source of truth for names).
+  // Re-seed form when month data arrives (only once per month).
+  const [seededFor, setSeededFor] = useState('')
   useEffect(() => {
-    const q = query(collection(db, 'funders'), orderBy('name'))
-    const unsub = onSnapshot(
-      q,
-      (snap) => setFunders(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-      (e) => setError(e.message),
-    )
-    return unsub
-  }, [])
-
-  // 2) Load existing donation entries for the selected month from Realtime DB.
-  useEffect(() => {
-    setExistingLoaded(false)
-    setExisting({})
-    setMessage('')
-    setError('')
-    const monthRef = ref(rtdb, `donations/${month}`)
-    const unsub = onValue(
-      monthRef,
-      (snap) => {
-        setExisting(snap.val() || {})
-        setExistingLoaded(true)
-      },
-      (e) => {
-        setError(e.message)
-        setExistingLoaded(true)
-      },
-    )
-    return unsub
-  }, [month])
-
-  // 3) Once the month's data arrives, seed the form (only once per month).
-  const seededFor = useRef('')
-  useEffect(() => {
-    if (!existingLoaded) return
-    if (seededFor.current === month) return
-    seededFor.current = month
-
+    if (existingLoading) return
+    if (seededFor === month) return
     const chk = {}
     const amt = {}
-    Object.entries(existing).forEach(([id, entry]) => {
-      chk[id] = true
-      amt[id] = entry.amount != null ? String(entry.amount) : ''
-    })
+    for (const e of existing) {
+      if (e.orphan) continue
+      chk[e.funderId] = true
+      amt[e.funderId] = e.amount != null ? String(e.amount) : ''
+    }
     setChecked(chk)
     setAmounts(amt)
-  }, [existingLoaded, existing, month])
+    setSeededFor(month)
+  }, [existingLoading, existing, month, seededFor])
 
-  const toggle = (id) =>
-    setChecked((prev) => ({ ...prev, [id]: !prev[id] }))
-
-  const setAmount = (id, value) =>
-    setAmounts((prev) => ({ ...prev, [id]: value }))
+  const toggle = (id) => setChecked((prev) => ({ ...prev, [id]: !prev[id] }))
+  const setAmount = (id, value) => setAmounts((prev) => ({ ...prev, [id]: value }))
 
   const selectAll = () => {
     const all = {}
-    funders.forEach((f) => {
-      all[f.id] = true
-    })
+    funders.forEach((f) => { all[f.id] = true })
     setChecked(all)
   }
-
-  const clearAll = () => {
-    setChecked({})
-  }
+  const clearAll = () => setChecked({})
 
   const selectedIds = useMemo(
-    () => Object.keys(checked).filter((id) => checked[id]),
+    () => Object.keys(checked).filter((id) => checked[id]).map(Number),
     [checked],
   )
-
   const selectedTotal = useMemo(
     () => selectedIds.reduce((sum, id) => sum + (Number(amounts[id]) || 0), 0),
     [selectedIds, amounts],
   )
-
   const savedTotal = useMemo(
-    () => Object.values(existing).reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
+    () => (existing || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
     [existing],
   )
-
-  // Entries that were saved for this month but whose funder no longer exists.
-  const orphanEntries = useMemo(() => {
-    const ids = new Set(funders.map((f) => f.id))
-    return Object.entries(existing)
-      .filter(([id]) => !ids.has(id))
-      .map(([id, entry]) => ({ id, ...entry }))
-  }, [existing, funders])
+  const orphanEntries = useMemo(() => (existing || []).filter((e) => e.orphan), [existing])
 
   function shiftMonth(delta) {
     let idx = monthIdx + delta
     let y = year
-    if (idx < 0) {
-      idx = 11
-      y -= 1
-    } else if (idx > 11) {
-      idx = 0
-      y += 1
-    }
-    setMonthIdx(idx)
-    setYear(y)
+    if (idx < 0) { idx = 11; y -= 1 }
+    else if (idx > 11) { idx = 0; y += 1 }
+    setMonthIdx(idx); setYear(y)
   }
-
   function goToThisMonth() {
     const d = new Date()
-    setMonthIdx(d.getMonth())
-    setYear(d.getFullYear())
+    setMonthIdx(d.getMonth()); setYear(d.getFullYear())
   }
 
   async function save() {
-    setMessage('')
-    setError('')
+    setMessage(''); setLocalError('')
+    if (selectedIds.length === 0) { setLocalError('Select at least one funder to save.'); return }
 
-    const ids = selectedIds
-    if (ids.length === 0) {
-      setError('Select at least one funder to save.')
-      return
-    }
-
-    // Validate amounts.
-    const invalid = ids.filter((id) => {
+    const invalid = selectedIds.filter((id) => {
       const v = Number(amounts[id])
       return !v || v <= 0
     })
     if (invalid.length > 0) {
-      setError('Please enter a valid amount (greater than 0) for every selected funder.')
+      setLocalError('Please enter a valid amount (greater than 0) for every selected funder.')
       return
     }
 
-    const toRemove = Object.keys(existing).filter((id) => !checked[id])
+    const existingIds = new Set((existing || []).filter((e) => !e.orphan).map((e) => e.funderId))
+    const toRemove = [...existingIds].filter((id) => !checked[id])
     if (toRemove.length > 0) {
       const ok = window.confirm(
         `Saving will remove ${toRemove.length} previously saved donor(s) from ${MONTHS[monthIdx]} ${year}.\n\nContinue?`,
@@ -161,48 +96,29 @@ export default function Donations() {
 
     setBusy(true)
     try {
-      const funderMap = Object.fromEntries(funders.map((f) => [f.id, f]))
-      const updates = {}
-
-      ids.forEach((id) => {
-        const f = funderMap[id]
-        updates[`${id}/name`] = f?.name || existing[id]?.name || 'Funder'
-        updates[`${id}/phone`] = f?.phone || existing[id]?.phone || ''
-        updates[`${id}/amount`] = Number(amounts[id])
-        updates[`${id}/savedAt`] = Date.now()
-      })
-
-      toRemove.forEach((id) => {
-        updates[id] = null // null deletes the key in Realtime DB
-      })
-
-      await update(ref(rtdb, `donations/${month}`), updates)
-      setMessage(
-        `Saved ${ids.length} donor(s) for ${MONTHS[monthIdx]} ${year}.`,
-      )
+      const updates = selectedIds.map((id) => ({ funderId: id, amount: Number(amounts[id]) }))
+      await mutations.saveMonth(month, { updates, removes: toRemove })
+      setMessage(`Saved ${updates.length} donor(s) for ${MONTHS[monthIdx]} ${year}.`)
     } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
-    }
+      setLocalError(err.message)
+    } finally { setBusy(false) }
   }
 
-  async function removeEntry(id) {
+  async function removeEntry(funderId) {
+    const entry = (existing || []).find((e) => e.funderId === funderId)
     const ok = window.confirm(
-      `Remove "${existing[id]?.name || 'this donor'}" from ${MONTHS[monthIdx]} ${year}?`,
+      `Remove "${entry?.name || 'this donor'}" from ${MONTHS[monthIdx]} ${year}?`,
     )
     if (!ok) return
-    setMessage('')
-    setError('')
+    setMessage(''); setLocalError('')
     try {
-      await update(ref(rtdb, `donations/${month}`), { [id]: null })
+      await mutations.saveMonth(month, { updates: [], removes: [funderId] })
       setMessage('Donor removed.')
-    } catch (err) {
-      setError(err.message)
-    }
+    } catch (err) { setLocalError(err.message) }
   }
 
   const years = yearRange(6)
+  const error = fe || de || localError
 
   return (
     <div>
@@ -216,31 +132,16 @@ export default function Donations() {
 
       <div className="card month-bar">
         <div className="month-nav">
-          <button type="button" className="icon-btn" onClick={() => shiftMonth(-1)} aria-label="Previous month">
-            ‹
-          </button>
-
+          <button type="button" className="icon-btn" onClick={() => shiftMonth(-1)} aria-label="Previous month">‹</button>
           <select value={monthIdx} onChange={(e) => setMonthIdx(Number(e.target.value))}>
-            {MONTHS.map((m, i) => (
-              <option key={m} value={i}>{m}</option>
-            ))}
+            {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
           </select>
-
           <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
+            {years.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
-
-          <button type="button" className="icon-btn" onClick={() => shiftMonth(1)} aria-label="Next month">
-            ›
-          </button>
-
-          <button type="button" className="btn ghost" onClick={goToThisMonth}>
-            This month
-          </button>
+          <button type="button" className="icon-btn" onClick={() => shiftMonth(1)} aria-label="Next month">›</button>
+          <button type="button" className="btn ghost" onClick={goToThisMonth}>This month</button>
         </div>
-
         <div className="month-summary">
           <span className="muted">Saved this month:</span>
           <strong>৳{formatCurrency(savedTotal)}</strong>
@@ -254,12 +155,7 @@ export default function Donations() {
             <span className="muted">{selectedIds.length} selected · ৳{formatCurrency(selectedTotal)}</span>
             <button type="button" className="btn ghost" onClick={selectAll}>Select all</button>
             <button type="button" className="btn ghost" onClick={clearAll}>Clear</button>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={save}
-              disabled={busy || !existingLoaded}
-            >
+            <button type="button" className="btn primary" onClick={save} disabled={busy || existingLoading}>
               {busy ? 'Saving…' : 'Save'}
             </button>
           </div>
@@ -267,6 +163,8 @@ export default function Donations() {
 
         {funders.length === 0 ? (
           <p className="muted">No funders yet. Add funders on the “Funders” page first.</p>
+        ) : existingLoading ? (
+          <p className="muted">Loading…</p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -289,15 +187,11 @@ export default function Donations() {
               <tbody>
                 {funders.map((f) => {
                   const isChecked = !!checked[f.id]
-                  const isSaved = !!existing[f.id]
+                  const isSaved = (existing || []).some((e) => e.funderId === f.id && !e.orphan)
                   return (
                     <tr key={f.id} className={isChecked ? 'row-selected' : ''}>
                       <td className="check-col">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggle(f.id)}
-                        />
+                        <input type="checkbox" checked={isChecked} onChange={() => toggle(f.id)} />
                       </td>
                       <td className="strong">{f.name}</td>
                       <td>{f.phone || '—'}</td>
@@ -336,8 +230,7 @@ export default function Donations() {
             <h3>Saved entries for removed funders</h3>
           </div>
           <p className="muted">
-            These donors were saved for this month but no longer exist in your funders
-            list. Remove them if they are no longer needed.
+            These donors were saved for this month but no longer exist in your funders list. Remove them if they are no longer needed.
           </p>
           <div className="table-wrap">
             <table>
@@ -351,14 +244,12 @@ export default function Donations() {
               </thead>
               <tbody>
                 {orphanEntries.map((e) => (
-                  <tr key={e.id}>
+                  <tr key={e.funderId}>
                     <td className="strong">{e.name || '—'}</td>
                     <td className="num strong">৳{formatCurrency(e.amount)}</td>
-                    <td className="muted">{formatDateTime(e.savedAt)}</td>
+                    <td className="muted">{new Date(e.savedAt).toLocaleString()}</td>
                     <td className="actions-col">
-                      <button className="btn small danger" onClick={() => removeEntry(e.id)}>
-                        Remove
-                      </button>
+                      <button className="btn small danger" onClick={() => removeEntry(e.funderId)}>Remove</button>
                     </td>
                   </tr>
                 ))}

@@ -1,13 +1,19 @@
 # Sadiq Travels — Donor & Monthly Donation Manager
 
-A fully-English admin web app for **Sadiq Travels** to manage funders (donors) and
-record monthly donations. Built with:
+A fully-English admin web app for **Sadiq Travels** to manage funders (donors)
+and record monthly donations. Built with:
 
-- **Firebase Authentication** (Email/Password) — the admin signs in. You create the
-  admin account in the Firebase Console.
-- **Firestore** — stores the **Funders (donors)** list.
-- **Realtime Database** — stores the **monthly donation records**.
+- **Turso (libSQL)** — persistent relational database for funders, donations
+  and admin accounts.
+- **Netlify Functions** — serverless backend that signs JWTs, talks to Turso,
+  and exposes a small `/api/*` surface to the React frontend.
+- **JWT + bcrypt auth** — passwords are hashed with bcrypt; sessions are
+  httpOnly cookies signed with a `JWT_SECRET`.
 - **React + Vite** — frontend.
+
+When no database is configured (e.g. previewing locally without a `.env`), the
+app falls back to a browser-only **demo mode** backed by `localStorage` so the
+UI stays usable with the credentials `demo@example.com` / `demo123`.
 
 ---
 
@@ -18,57 +24,32 @@ record monthly donations. Built with:
 | **Dashboard** | Live totals: funders, this month, this year, all time + recent donations. |
 | **Funders** | Add / edit / delete / search funder names (with optional phone & note). |
 | **Donations** | Pick a month (or use ‹ › to switch months), tick funders, enter each amount, and **Save**. Every month is kept permanently and can be viewed again by selecting that month. |
-
-All data syncs in real time (updates appear instantly on every open device).
+| **Admins** | Add, edit and remove administrator accounts. Also change your own password. |
 
 ---
 
-## 1. Create the Firebase project (one-time setup)
+## 1. One-time setup
 
-1. Go to [https://console.firebase.google.com](https://console.firebase.google.com) and
-   **Create a project** (e.g. `sadik-travels`).
-2. In the project, add a **Web app**:
-   - Project settings → **Your apps** → the web icon **`</>`** → register it.
-   - Note the **Firebase config** values (shown under "SDK setup and configuration").
-3. **Build → Realtime Database → Create Database** (choose a location; "Start in
-   test mode" is fine for a private admin app, or use the rules below).
-4. **Build → Firestore Database → Create Database** (same — test mode is fine, or use
-   the rules below).
-5. **Build → Authentication → Get started → Sign-in method → Email/Password → Enable**.
-6. **Authentication → Users → Add user** — enter your admin email and password.
-   This is the account you sign in with.
+### 1.1 Create a Turso database
 
-### Recommended security rules
+1. Sign up at [https://turso.tech](https://turso.tech) and create a database
+   (e.g. `sadik-travels`).
+2. From the database page, copy the **Database URL** (`libsql://…`) and create
+   an **Auth Token** (both are in the "Getting Started" / "Tokens" tabs).
 
-**Realtime Database** (Rules tab) — only signed-in admins can read/write:
+### 1.2 Generate a JWT secret
 
-```json
-{
-  "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null"
-  }
-}
+Pick a long random string for signing session tokens. On macOS / Linux:
+
+```bash
+openssl rand -hex 32
 ```
 
-**Firestore** (Rules tab) — only signed-in admins can read/write `funders`:
+### 1.3 Decide on your first admin
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /funders/{funderId} {
-      allow read, write: if request.auth != null;
-    }
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-```
-
-> Both rule files are included in this repo: `database.rules.json` and
-> `firestore.rules`.
+Choose an email and password for the default administrator. The app will
+auto-create that account the first time it boots (only when the admins table
+is empty). After that you can add/edit/remove admins from the **Admins** page.
 
 ---
 
@@ -80,68 +61,79 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` and paste your Firebase config:
+Edit `.env` and fill in your values:
 
 ```
-VITE_FIREBASE_API_KEY=AIza...
-VITE_FIREBASE_AUTH_DOMAIN=sadik-travels.firebaseapp.com
-VITE_FIREBASE_DATABASE_URL=https://sadik-travels-default-rtdb.firebaseio.com
-VITE_FIREBASE_PROJECT_ID=sadik-travels
-VITE_FIREBASE_STORAGE_BUCKET=sadik-travels.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=1234567890
-VITE_FIREBASE_APP_ID=1:1234567890:web:abc123
+TURSO_DB_URL=libsql://your-db.turso.io
+TURSO_DB_AUTH_TOKEN=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9...
+JWT_SECRET=paste-the-long-random-string
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=your-strong-password
 ```
 
-Then start it:
+Then start the dev server (the API runs in-process via a Vite plugin — no
+separate backend to run):
 
 ```bash
 npm run dev
 ```
 
-Open the printed URL (http://localhost:5173) and sign in with your admin email/password.
+Open http://localhost:5173 and sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+
+> If you skip `.env`, the app still boots in **demo mode** with an in-browser
+> store. Sign in with `demo@example.com` / `demo123`.
 
 ---
 
-## 3. Deploy on Render (free static site)
+## 3. Deploy to Netlify
 
-The repo includes a **`render.yaml`** Blueprint so Render deploys it automatically.
+The repo ships with a `netlify.toml` that configures the build and the `/api/*`
+rewrite to the serverless function in `netlify/functions/api.mjs`.
 
 1. Push this repository to **GitHub**.
-2. Go to [https://render.com](https://render.com) → **New → Blueprint** → connect the repo.
-   - (Alternatively: **New → Static Site**, set:
-     - Build command: `npm install && npm run build`
-     - Publish directory: `sadik-travels/dist`
-     - Root directory: `sadik-travels`)
-3. In **Environment → Environment Variables**, add the same 7 `VITE_FIREBASE_*`
-   variables from your `.env`.
-4. Deploy. Render builds the site and gives you a public `https://...onrender.com`
-   URL — sign in and use it from anywhere.
+2. In Netlify: **Add new site → Import an existing project → connect GitHub → choose the repo**.
+   - Build command: `npm run build` (already set in `netlify.toml`)
+   - Publish directory: `dist` (already set)
+   - Functions directory: `netlify/functions` (already set)
+3. Go to **Site configuration → Environment variables** and add:
 
-> **Important:** the `VITE_*` variables are read **at build time**. After changing
-> them in Render, trigger a new deploy so the site rebuilds with the new values.
+   | Key | Value |
+   | --- | --- |
+   | `TURSO_DB_URL` | Your Turso `libsql://…` URL |
+   | `TURSO_DB_AUTH_TOKEN` | Your Turso auth token |
+   | `JWT_SECRET` | Long random string |
+   | `ADMIN_EMAIL` | Email for the first admin (one-time seed) |
+   | `ADMIN_PASSWORD` | Password for the first admin (one-time seed) |
+
+4. Trigger a deploy. The site will come up at `https://<your-site>.netlify.app`.
+   Sign in with your `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+
+> **Important:** Environment variables are read **at runtime** by the
+> serverless functions (not baked into the build). If you change them in the
+> Netlify dashboard, just wait a moment for the function to cold-start again
+> — no redeploy is required.
+>
+> To change the default admin later, go to the **Admins** page inside the app
+> (the env vars are only used on a completely empty `admins` table).
 
 ---
 
-## How data is stored
+## How data is stored (Turso schema)
 
-- **Funders → Firestore**
-  - Collection `funders`, each document: `{ name, phone, note, createdAt }`.
-- **Donations → Realtime Database**
-  ```
-  donations/
-    ├─ 2026-08/
-    │    ├─ <funderId>/ { name, phone, amount, savedAt }
-    │    └─ ...
-    └─ 2026-09/ ...
-  ```
-  The month key is `YYYY-MM`. Selecting a month shows/edits exactly that month, and
-  past months stay saved forever.
+Three tables are created automatically on first run:
+
+- **admins** — `id, email (unique), password_hash (bcrypt), display_name, created_at, last_login_at`
+- **funders** — `id, name, phone, note, created_at`
+- **donations** — `(month, funder_id) PK, name, phone, amount, saved_at`
+  - Month key is `YYYY-MM`. Funder name/phone are snapshotted at save time so
+    renaming or deleting a funder does not rewrite past donation records.
 
 ---
 
 ## Notes
 
-- The interface is **entirely in English**.
-- Donations are in **Bangladeshi Taka (৳)** by default; you can rename the currency
-  anywhere `৳` appears in the code if needed.
-- Deleting a funder does **not** delete past donation records.
+- The interface is entirely in **English**.
+- Donations are in **Bangladeshi Taka (৳)** by default; you can rename the
+  currency anywhere `৳` appears in the code if needed.
+- Deleting a funder also removes their monthly donation rows.
+- All admin passwords are hashed with bcrypt before storage.
