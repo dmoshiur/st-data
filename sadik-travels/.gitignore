@@ -4,8 +4,9 @@ node_modules
 # build output
 dist
 dist-ssr
+.netlify
 
-# local env files (never commit real Firebase keys)
+# local env files (never commit real secrets)
 .env
 .env.local
 .env.*.local
@@ -14,6 +15,7 @@ dist-ssr
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+netlify-debug.log*
 
 # editor / OS
 .vscode/*

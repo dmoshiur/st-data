@@ -4,6 +4,7 @@ const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
   { id: 'funders', label: 'Funders', icon: '👥' },
   { id: 'donations', label: 'Donations', icon: '💝' },
+  { id: 'admins', label: 'Admins', icon: '🛡️' },
 ]
 
 export default function Layout({ page, setPage, children }) {
@@ -39,7 +40,7 @@ export default function Layout({ page, setPage, children }) {
             <div className="avatar">{user?.email?.[0]?.toUpperCase()}</div>
             <div className="admin-info">
               <div className="admin-email" title={user?.email}>{user?.email}</div>
-              <div className="admin-role">Administrator</div>
+              <div className="admin-role">{user?.displayName || 'Administrator'}</div>
             </div>
           </div>
           <button type="button" className="btn ghost block" onClick={logout}>
