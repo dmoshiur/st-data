@@ -27,3 +27,6 @@ netlify-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Vercel
+.vercel

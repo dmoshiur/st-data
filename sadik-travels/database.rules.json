@@ -1,0 +1,38 @@
+{
+  "//": [
+    "Realtime Database rules — only used when VITE_FIREBASE_DATABASE_URL is set",
+    "(donations are then stored here instead of in Firestore).",
+    "",
+    "The app mirrors the admin roster into /admins/<uid> = true so these rules",
+    "can authorise writes without reaching into Firestore.",
+    "",
+    "FIRST-RUN BOOTSTRAP: the /admins node is writable by any signed-in user",
+    "so the very first administrator can be recorded. Once the owner exists,",
+    "replace the /admins .write rule with:",
+    "    \".write\": \"auth != null && root.child('admins/' + auth.uid).exists()\"",
+    "and redeploy:  firebase deploy --only database"
+  ],
+  "rules": {
+    "admins": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$uid": {
+        ".validate": "newData.isBoolean()"
+      }
+    },
+    "donations": {
+      ".read": "auth != null && root.child('admins/' + auth.uid).exists()",
+      ".write": "auth != null && root.child('admins/' + auth.uid).exists()",
+      "$month": {
+        ".validate": "$month.matches(/^\\d{4}-(0[1-9]|1[0-2])$/)",
+        "$funderId": {
+          "name": { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "phone": { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "amount": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "savedAt": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        }
+      }
+    }
+  }
+}

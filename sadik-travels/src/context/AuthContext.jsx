@@ -1,77 +1,93 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { api } from '../store/api'
-import { demoAuth } from '../store/demoData'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { backend, isDemoMode } from '../store/index.js'
+import { isFirebaseConfigured, firebaseEnv } from '../lib/firebase.js'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  // undefined = still checking, null = signed out, object = signed in
+  // undefined = still resolving the session, null = signed out, object = signed in
   const [user, setUser] = useState(undefined)
-  const [configured, setConfigured] = useState(undefined)
-
-  const refresh = useCallback(async () => {
-    try {
-      if (configured === false) {
-        setUser(demoAuth.currentUser)
-        return
-      }
-      const me = await api.me()
-      setUser(me.user || null)
-    } catch (_e) {
-      setUser(null)
-    }
-  }, [configured])
+  const [authError, setAuthError] = useState('')
+  const [needsSetup, setNeedsSetup] = useState(false)
 
   useEffect(() => {
-    let mounted = true
-    async function init() {
-      let cfg = false
-      try {
-        const h = await api.health()
-        cfg = !!(h && h.configured && !h.demo)
-      } catch (_e) { cfg = false }
-      if (!mounted) return
-      setConfigured(cfg)
-      if (cfg) {
-        try {
-          const me = await api.me()
-          setUser(me.user || null)
-        } catch (_e) { setUser(null) }
-      } else {
-        setUser(demoAuth.currentUser)
-      }
+    let alive = true
+    const unsub = backend.onAuthChange((next, err) => {
+      if (!alive) return
+      setUser(next)
+      setAuthError(err || '')
+    })
+    return () => {
+      alive = false
+      if (typeof unsub === 'function') unsub()
     }
-    init()
-    return () => { mounted = false }
   }, [])
 
-  async function login(email, password) {
-    if (configured) {
-      const r = await api.login(email, password)
-      setUser(r.user)
-      return r.user
+  // No administrators yet? Offer first-run setup instead of a dead sign-in
+  // form. Runs for both backends — a brand-new Firebase project and a fresh
+  // browser in demo mode are the same situation from the user's point of view.
+  useEffect(() => {
+    let alive = true
+    if (user !== null && user !== undefined) {
+      setNeedsSetup(false)
+      return
     }
-    const r = await demoAuth.login(email, password)
-    setUser(r.user)
-    return r.user
-  }
+    backend
+      .isAdminsEmpty()
+      .then((empty) => {
+        if (alive) setNeedsSetup(!!empty)
+      })
+      .catch(() => {
+        // Rules may block an unauthenticated read. Fall back to the sign-in
+        // form; VITE_SEED_ADMIN_* still bootstraps the first account.
+        if (alive) setNeedsSetup(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [user])
 
-  async function logout() {
-    if (configured) {
-      try { await api.logout() } catch (_e) { /* ignore */ }
-    } else {
-      await demoAuth.logout()
-    }
+  const login = useCallback(async (email, password) => {
+    const result = await backend.signIn(email, password)
+    setUser(result.user)
+    setNeedsSetup(false)
+    return result.user
+  }, [])
+
+  const createFirst = useCallback(async (email, password, displayName) => {
+    const result = await backend.createFirstAdmin(email, password, displayName)
+    setUser(result.user)
+    setNeedsSetup(false)
+    return result.user
+  }, [])
+
+  const logout = useCallback(async () => {
+    await backend.signOut()
     setUser(null)
-  }
+  }, [])
 
-  return (
-    <AuthContext.Provider value={{ user, configured, login, logout, refresh, setUser }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      authError,
+      needsSetup,
+      configured: isFirebaseConfigured,
+      isDemoMode,
+      diagnostics: firebaseEnv,
+      backendKind: backend.kind,
+      login,
+      createFirst,
+      logout,
+      setUser,
+    }),
+    [user, authError, needsSetup, login, createFirst, logout],
   )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
-  return useContext(AuthContext)
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
+  return ctx
 }
