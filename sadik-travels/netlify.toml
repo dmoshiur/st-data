@@ -1,34 +1,33 @@
-# Netlify build & redirect configuration.
+# Netlify build configuration.
 #
-# The frontend is a Vite SPA. It talks to the serverless backend through
-# /api/*, which we rewrite to the single `api` function. Environment
-# variables (TURSO_DB_URL, TURSO_DB_AUTH_TOKEN, JWT_SECRET, ADMIN_EMAIL,
-# ADMIN_PASSWORD) are read at RUNTIME by the function, so you can set them
-# in the Netlify dashboard → Site settings → Environment variables and
-# they take effect without a rebuild.
+# The app is a static Vite SPA that talks directly to Firebase from the
+# browser — there is no server component, so there are no functions to
+# configure. The only thing Netlify needs to do is build `dist` and fall back
+# to index.html for client-side routes.
+#
+# Environment variables (VITE_FIREBASE_*) are read at BUILD time by Vite, so
+# after changing them in the Netlify dashboard you must trigger a redeploy.
 
 [build]
+  base = "sadik-travels"
   command = "npm run build"
   publish = "dist"
-  functions = "netlify/functions"
 
-# SPA fallback — send every non-file path to index.html (except /api/*).
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback — every non-asset path serves index.html.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  force = false
-  conditions = { Role = [] }
 
-# Send all /api/* requests to our single catch-all function.
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
-  status = 200
-  force = true
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
 
-[dev]
-  framework = "vite"
-  # The Vite plugin already mounts the API during dev, so we don't tell
-  # Netlify Dev about any separate functions dir — avoids double-handling.
-  targetPort = 5173
+[[headers]]
+  for = "/config.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

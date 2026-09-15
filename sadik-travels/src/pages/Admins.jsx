@@ -1,151 +1,192 @@
 import { useState } from 'react'
+import { backend, useAdmins } from '../store/index.js'
 import { useAuth } from '../context/AuthContext'
-import { useAdmins, mutations } from '../store/database'
-import { formatDateTime } from '../utils'
+import { useI18n } from '../i18n/index.jsx'
+import { useFormat } from '../i18n/format.js'
+import { Icon } from '../components/Icons.jsx'
+import { useToast, useConfirm } from '../components/Feedback.jsx'
+import { Skeleton } from '../components/Loading.jsx'
 
-const emptyForm = { email: '', password: '', displayName: '' }
+const EMPTY = { email: '', password: '', displayName: '' }
 
 export default function Admins() {
+  const { t } = useI18n()
+  const { dateTime } = useFormat()
   const { user } = useAuth()
+  const toast = useToast()
+  const confirm = useConfirm()
   const { data: admins = [], error, loading } = useAdmins()
-  const [form, setForm] = useState(emptyForm)
+
+  const [form, setForm] = useState(EMPTY)
   const [editingId, setEditingId] = useState(null)
-  const [editForm, setEditForm] = useState(emptyForm)
+  const [draft, setDraft] = useState(EMPTY)
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
-  const [localError, setLocalError] = useState('')
 
-  // Change own password form state.
-  const [pwForm, setPwForm] = useState({ current: '', next: '' })
-  const [pwMsg, setPwMsg] = useState('')
-  const [pwErr, setPwErr] = useState('')
+  const [pw, setPw] = useState({ current: '', next: '' })
   const [pwBusy, setPwBusy] = useState(false)
-
-  const clearMsg = () => { setMessage(''); setLocalError('') }
 
   async function addAdmin(e) {
     e.preventDefault()
-    clearMsg()
-    if (!form.email.trim()) { setLocalError('Email is required.'); return }
-    if (!form.password || form.password.length < 6) { setLocalError('Password must be at least 6 characters.'); return }
+    if (!form.email.trim()) {
+      toast.error(t('email'))
+      return
+    }
+    if (!form.password || form.password.length < 6) {
+      toast.error(t('passwordMin6'))
+      return
+    }
     setBusy(true)
     try {
-      await mutations.createAdmin(form)
-      setForm(emptyForm)
-      setMessage('Admin added.')
-    } catch (err) { setLocalError(err.message) }
-    finally { setBusy(false) }
+      await backend.createAdmin(form)
+      setForm(EMPTY)
+      toast.success(t('adminAdded'))
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
-
-  function startEdit(a) {
-    setEditingId(a.id)
-    setEditForm({ email: a.email, displayName: a.displayName || '', password: '' })
-    clearMsg()
-  }
-  function cancelEdit() { setEditingId(null); setEditForm(emptyForm) }
 
   async function saveEdit() {
-    clearMsg()
     setBusy(true)
     try {
-      await mutations.updateAdmin(editingId, {
-        email: editForm.email.trim(),
-        displayName: editForm.displayName,
-        password: editForm.password,
-      })
-      setEditingId(null); setEditForm(emptyForm)
-      setMessage('Admin updated.')
-    } catch (err) { setLocalError(err.message) }
-    finally { setBusy(false) }
+      await backend.updateAdmin(editingId, draft)
+      setEditingId(null)
+      setDraft(EMPTY)
+      toast.success(t('adminUpdated'))
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function removeAdmin(a) {
     if (a.id === user.id) {
-      setLocalError('You cannot delete your own account while signed in.')
+      toast.error(t('cannotDeleteSelf'))
       return
     }
-    const ok = window.confirm(`Remove admin "${a.email}"? They will no longer be able to sign in.`)
+    const ok = await confirm({
+      title: t('adminRemoved'),
+      body: t('confirmDeleteAdmin', { email: a.email }),
+      confirmLabel: t('confirm'),
+    })
     if (!ok) return
-    clearMsg()
     setBusy(true)
     try {
-      await mutations.deleteAdmin(a.id, user.id)
-      setMessage('Admin removed.')
-    } catch (err) { setLocalError(err.message) }
-    finally { setBusy(false) }
+      await backend.deleteAdmin(a.id)
+      toast.success(t('adminRemoved'))
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function sendReset(a) {
+    try {
+      await backend.sendPasswordReset(a.email)
+      toast.success(t('resetSent', { email: a.email }))
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   async function changePassword(e) {
     e.preventDefault()
-    setPwMsg(''); setPwErr('')
-    if (!pwForm.current || !pwForm.next) { setPwErr('Current and new password are required.'); return }
-    if (pwForm.next.length < 6) { setPwErr('New password must be at least 6 characters.'); return }
+    if (!pw.current || pw.next.length < 6) {
+      toast.error(t('passwordMin6'))
+      return
+    }
     setPwBusy(true)
     try {
-      await mutations.changePassword(user.id, pwForm.current, pwForm.next)
-      setPwMsg('Password updated.')
-      setPwForm({ current: '', next: '' })
-    } catch (err) { setPwErr(err.message) }
-    finally { setPwBusy(false) }
+      await backend.changeMyPassword(user, pw.current, pw.next)
+      setPw({ current: '', next: '' })
+      toast.success(t('passwordUpdated'))
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setPwBusy(false)
+    }
   }
 
   return (
-    <div>
-      <div className="page-head">
-        <h2>Administrators</h2>
-        <p>Manage who can sign in to this dashboard.</p>
-      </div>
+    <div className="page">
+      <header className="page-head">
+        <div>
+          <h2>{t('adminsTitle')}</h2>
+          <p>{t('adminsSub')}</p>
+        </div>
+        <span className="pill">{t('total', { count: admins.length })}</span>
+      </header>
 
-      {message && <div className="toast success">{message}</div>}
-      {(error || localError) && <div className="toast error">{error || localError}</div>}
+      {error && (
+        <div className="notice error" role="alert">
+          <Icon name="alert" size={16} />
+          <span>{error}</span>
+        </div>
+      )}
 
-      <div className="card">
-        <h3>Add Admin</h3>
+      <section className="card">
+        <h3 className="card-title">{t('addAdmin')}</h3>
         <form className="form-row" onSubmit={addAdmin}>
-          <input
-            placeholder="Email *"
-            type="email"
-            value={form.email}
-            className="grow"
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-          <input
-            placeholder="Display name (optional)"
-            value={form.displayName}
-            onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-          />
-          <input
-            placeholder="Password (min 6 chars) *"
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-          />
+          <label className="field grow">
+            <span>{t('email')} *</span>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              autoComplete="off"
+            />
+          </label>
+          <label className="field grow">
+            <span>{t('displayName')}</span>
+            <input
+              value={form.displayName}
+              onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+              autoComplete="off"
+            />
+          </label>
+          <label className="field">
+            <span>{t('passwordMin6')} *</span>
+            <input
+              type="password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              autoComplete="new-password"
+              minLength={6}
+            />
+          </label>
           <button type="submit" className="btn primary" disabled={busy}>
-            {busy ? 'Adding…' : '+ Add'}
+            <Icon name="plus" size={16} />
+            {t('addAdmin')}
           </button>
         </form>
-      </div>
+      </section>
 
-      <div className="card">
+      <section className="card">
         <div className="card-head">
-          <h3>Admin Accounts</h3>
-          <span className="pill">{admins.length} total</span>
+          <h3>{t('adminAccounts')}</h3>
+          <span className="muted small">{t('passwordNote')}</span>
         </div>
 
         {loading ? (
-          <p className="muted">Loading…</p>
+          <Skeleton rows={5} />
         ) : admins.length === 0 ? (
-          <p className="muted">No admins found.</p>
+          <div className="empty">
+            <Icon name="admins" size={26} />
+            <p>{t('adminsSub')}</p>
+          </div>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Email</th>
-                  <th>Display Name</th>
-                  <th>Created</th>
-                  <th>Last Sign In</th>
-                  <th className="actions-col">Actions</th>
+                  <th>{t('email')}</th>
+                  <th>{t('displayName')}</th>
+                  <th>{t('created')}</th>
+                  <th>{t('lastSignIn')}</th>
+                  <th className="actions-col">{t('actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -153,43 +194,71 @@ export default function Admins() {
                   editingId === a.id ? (
                     <tr key={a.id} className="editing-row">
                       <td>
-                        <input type="email" value={editForm.email}
-                          onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+                        <input
+                          type="email"
+                          value={draft.email}
+                          onChange={(e) => setDraft({ ...draft, email: e.target.value })}
+                        />
                       </td>
                       <td>
-                        <input value={editForm.displayName}
-                          onChange={(e) => setEditForm({ ...editForm, displayName: e.target.value })}
-                          placeholder="(optional)" />
+                        <input
+                          value={draft.displayName}
+                          onChange={(e) => setDraft({ ...draft, displayName: e.target.value })}
+                        />
                       </td>
-                      <td>—</td>
-                      <td>
-                        <input type="password" placeholder="New password (leave blank to keep)"
-                          value={editForm.password}
-                          onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} />
-                      </td>
+                      <td className="muted">—</td>
+                      <td className="muted">—</td>
                       <td className="actions-col">
-                        <button className="btn small primary" onClick={saveEdit} disabled={busy}>Save</button>
-                        <button className="btn small ghost" onClick={cancelEdit}>Cancel</button>
+                        <button type="button" className="btn small primary" onClick={saveEdit} disabled={busy}>
+                          <Icon name="check" size={14} />
+                          {t('save')}
+                        </button>
+                        <button type="button" className="btn small ghost" onClick={() => setEditingId(null)}>
+                          {t('cancel')}
+                        </button>
                       </td>
                     </tr>
                   ) : (
                     <tr key={a.id}>
                       <td className="strong">
                         {a.email}
-                        {a.id === user.id && <span className="badge saved" style={{ marginLeft: 8 }}>You</span>}
+                        {a.id === user.id && <span className="badge saved">{t('you')}</span>}
+                        {a.role === 'owner' && <span className="badge owner">{t('owner')}</span>}
                       </td>
                       <td>{a.displayName || '—'}</td>
-                      <td className="muted">{formatDateTime(a.createdAt)}</td>
-                      <td className="muted">{a.lastLoginAt ? formatDateTime(a.lastLoginAt) : 'Never'}</td>
+                      <td className="muted">{a.createdAt ? dateTime(a.createdAt) : '—'}</td>
+                      <td className="muted">{a.lastLoginAt ? dateTime(a.lastLoginAt) : t('never')}</td>
                       <td className="actions-col">
-                        <button className="btn small ghost" onClick={() => startEdit(a)}>Edit</button>
                         <button
-                          className="btn small danger"
+                          type="button"
+                          className="icon-btn sm"
+                          aria-label={t('edit')}
+                          title={t('edit')}
+                          onClick={() => {
+                            setEditingId(a.id)
+                            setDraft({ email: a.email, displayName: a.displayName || '', password: '' })
+                          }}
+                        >
+                          <Icon name="edit" size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-btn sm"
+                          aria-label={t('sendReset')}
+                          title={t('sendReset')}
+                          onClick={() => sendReset(a)}
+                        >
+                          <Icon name="mail" size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-btn sm danger"
+                          aria-label={t('delete')}
+                          title={t('delete')}
                           onClick={() => removeAdmin(a)}
                           disabled={a.id === user.id}
-                          title={a.id === user.id ? 'You cannot delete your own account' : ''}
                         >
-                          Delete
+                          <Icon name="trash" size={15} />
                         </button>
                       </td>
                     </tr>
@@ -199,30 +268,46 @@ export default function Admins() {
             </table>
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="card">
-        <h3>Change My Password</h3>
+      <section className="card">
+        <h3 className="card-title">{t('changeMyPassword')}</h3>
+        <p className="muted small">{t('resetNote')}</p>
         <form className="form-row" onSubmit={changePassword}>
-          <input
-            type="password"
-            placeholder="Current password"
-            value={pwForm.current}
-            onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })}
-          />
-          <input
-            type="password"
-            placeholder="New password (min 6 chars)"
-            value={pwForm.next}
-            onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })}
-          />
+          <label className="field">
+            <span>{t('currentPassword')}</span>
+            <input
+              type="password"
+              value={pw.current}
+              onChange={(e) => setPw({ ...pw, current: e.target.value })}
+              autoComplete="current-password"
+            />
+          </label>
+          <label className="field">
+            <span>{t('newPassword')}</span>
+            <input
+              type="password"
+              value={pw.next}
+              onChange={(e) => setPw({ ...pw, next: e.target.value })}
+              autoComplete="new-password"
+              minLength={6}
+            />
+          </label>
           <button type="submit" className="btn primary" disabled={pwBusy}>
-            {pwBusy ? 'Updating…' : 'Update password'}
+            {pwBusy ? (
+              <>
+                <span className="spinner sm" />
+                {t('updating')}
+              </>
+            ) : (
+              <>
+                <Icon name="key" size={16} />
+                {t('updatePassword')}
+              </>
+            )}
           </button>
         </form>
-        {pwMsg && <div className="toast success" style={{ marginTop: 12 }}>{pwMsg}</div>}
-        {pwErr && <div className="toast error" style={{ marginTop: 12 }}>{pwErr}</div>}
-      </div>
+      </section>
     </div>
   )
 }

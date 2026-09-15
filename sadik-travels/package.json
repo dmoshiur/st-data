@@ -1,23 +1,24 @@
 {
   "name": "sadik-travels-donor-manager",
   "private": true,
-  "version": "2.0.0",
-  "description": "Donor management app for Sadiq Travels (Turso + Netlify Functions + JWT auth)",
+  "version": "3.0.0",
+  "description": "Donor management app for Sadiq Travels (Firebase Auth + Firestore + Realtime Database, React + Vite)",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "test": "node --test tests/*.test.js",
+    "check": "npm run test && npm run build"
   },
   "dependencies": {
-    "@libsql/client": "^0.18.0",
-    "bcryptjs": "^3.0.3",
-    "jsonwebtoken": "^9.0.3",
+    "firebase": "^12.19.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^30.0.1",
     "vite": "^5.4.11"
   }
 }

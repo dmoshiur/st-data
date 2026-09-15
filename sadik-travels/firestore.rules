@@ -1,0 +1,68 @@
+rules_version = '2';
+
+// Firestore security rules for the Sadiq Travels donor ledger.
+//
+// Deploy with:
+//     npm i -g firebase-tools
+//     firebase login
+//     firebase use <your-project-id>
+//     firebase deploy --only firestore:rules
+//
+// ───────────────────────────────────────────────────────────────────────────
+// FIRST-RUN BOOTSTRAP — read this once.
+//
+// Creating the very first administrator is a chicken-and-egg problem: the
+// write has to be allowed before any admin exists. The `admins` create rule
+// below is therefore open to a signed-in user writing their own record.
+//
+// AS SOON AS the owner account exists, replace that one line with:
+//
+//     allow create: if isAdmin();
+//
+// and redeploy the rules. Everything else in this file is already locked down.
+// ───────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Admin roster. No passwords are ever stored here — Firebase Auth owns
+    // those. The only field readable without a session is the roster itself,
+    // which the sign-in screen needs to know whether first-run setup applies.
+    match /admins/{uid} {
+      allow get: if true;
+      allow list: if request.auth != null || request.query.limit == 1;
+      allow update, delete: if isAdmin();
+
+      // >>> TIGHTEN AFTER FIRST RUN — see the note at the top of this file. <<<
+      allow create: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /funders/{funderId} {
+      allow read, write: if isAdmin();
+    }
+
+    // donations/{YYYY-MM}/entries/{funderId} — the month document itself only
+    // exists as a parent, so it needs its own rule.
+    match /donations/{month} {
+      allow read: if isAdmin();
+      match /entries/{funderId} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // Per-month aggregates that power the dashboard totals without a full scan.
+    match /months/{month} {
+      allow read, write: if isAdmin();
+    }
+
+    // Default: deny everything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

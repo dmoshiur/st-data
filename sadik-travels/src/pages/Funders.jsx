@@ -1,166 +1,285 @@
-import { useState } from 'react'
-import { useFunders, mutations } from '../store/database'
+import { memo, useDeferredValue, useMemo, useState } from 'react'
+import { backend, useFunders } from '../store/index.js'
+import { useI18n } from '../i18n/index.jsx'
+import { Icon } from '../components/Icons.jsx'
+import { useToast, useConfirm } from '../components/Feedback.jsx'
+import { Skeleton } from '../components/Loading.jsx'
 
-const emptyForm = { name: '', phone: '', note: '' }
+const EMPTY = { name: '', phone: '', note: '' }
+
+const FunderRow = memo(function FunderRow({ funder, editing, draft, onChange, onSave, onCancel, onEdit, onDelete }) {
+  const { t } = useI18n()
+
+  if (editing) {
+    return (
+      <tr className="editing-row">
+        <td>
+          <input
+            value={draft.name}
+            onChange={(e) => onChange('name', e.target.value)}
+            placeholder={t('funderName')}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onSave()
+              if (e.key === 'Escape') onCancel()
+            }}
+          />
+        </td>
+        <td>
+          <input
+            value={draft.phone}
+            onChange={(e) => onChange('phone', e.target.value)}
+            placeholder={t('phone')}
+            inputMode="tel"
+          />
+        </td>
+        <td>
+          <input
+            value={draft.note}
+            onChange={(e) => onChange('note', e.target.value)}
+            placeholder={t('note')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onSave()
+              if (e.key === 'Escape') onCancel()
+            }}
+          />
+        </td>
+        <td className="actions-col">
+          <button type="button" className="btn small primary" onClick={onSave}>
+            <Icon name="check" size={14} />
+            {t('save')}
+          </button>
+          <button type="button" className="btn small ghost" onClick={onCancel}>
+            {t('cancel')}
+          </button>
+        </td>
+      </tr>
+    )
+  }
+
+  return (
+    <tr>
+      <td className="strong">{funder.name}</td>
+      <td>{funder.phone || '—'}</td>
+      <td className="muted">{funder.note || '—'}</td>
+      <td className="actions-col">
+        <button type="button" className="icon-btn sm" onClick={onEdit} title={t('edit') || 'Edit'} aria-label="Edit">
+          <Icon name="edit" size={15} />
+        </button>
+        <button
+          type="button"
+          className="icon-btn sm danger"
+          onClick={onDelete}
+          aria-label="Delete"
+        >
+          <Icon name="trash" size={15} />
+        </button>
+      </td>
+    </tr>
+  )
+})
 
 export default function Funders() {
+  const { t } = useI18n()
+  const toast = useToast()
+  const confirm = useConfirm()
   const { data: funders = [], error, loading } = useFunders()
-  const [form, setForm] = useState(emptyForm)
+
+  const [form, setForm] = useState(EMPTY)
   const [search, setSearch] = useState('')
   const [editingId, setEditingId] = useState(null)
-  const [editForm, setEditForm] = useState(emptyForm)
+  const [draft, setDraft] = useState(EMPTY)
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
-  const [localError, setLocalError] = useState('')
 
-  const clearMessages = () => { setMessage(''); setLocalError('') }
+  const deferredSearch = useDeferredValue(search)
+
+  const filtered = useMemo(() => {
+    const q = deferredSearch.trim().toLowerCase()
+    if (!q) return funders
+    return funders.filter(
+      (f) =>
+        (f.name || '').toLowerCase().includes(q) ||
+        (f.phone || '').includes(q) ||
+        (f.note || '').toLowerCase().includes(q),
+    )
+  }, [funders, deferredSearch])
 
   async function addFunder(e) {
     e.preventDefault()
-    clearMessages()
-    if (!form.name.trim()) { setLocalError('Funder name is required.'); return }
+    if (!form.name.trim()) {
+      toast.error(t('funderNameRequired'))
+      return
+    }
     setBusy(true)
     try {
-      await mutations.createFunder(form)
-      setForm(emptyForm)
-      setMessage('Funder added.')
-    } catch (err) { setLocalError(err.message) }
-    finally { setBusy(false) }
+      await backend.createFunder(form)
+      setForm(EMPTY)
+      toast.success(t('funderAdded'))
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   function startEdit(f) {
     setEditingId(f.id)
-    setEditForm({ name: f.name || '', phone: f.phone || '', note: f.note || '' })
-    clearMessages()
+    setDraft({ name: f.name || '', phone: f.phone || '', note: f.note || '' })
   }
-  function cancelEdit() { setEditingId(null); setEditForm(emptyForm) }
 
   async function saveEdit() {
-    clearMessages()
-    if (!editForm.name.trim()) { setLocalError('Funder name is required.'); return }
+    if (!draft.name.trim()) {
+      toast.error(t('funderNameRequired'))
+      return
+    }
     setBusy(true)
     try {
-      await mutations.updateFunder(editingId, editForm)
-      setEditingId(null); setEditForm(emptyForm)
-      setMessage('Funder updated.')
-    } catch (err) { setLocalError(err.message) }
-    finally { setBusy(false) }
+      await backend.updateFunder(editingId, draft)
+      setEditingId(null)
+      setDraft(EMPTY)
+      toast.success(t('funderUpdated'))
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
-  async function deleteFunder(f) {
-    const ok = window.confirm(
-      `Delete funder "${f.name}"?\n\nPast donation records will also be removed.`,
-    )
+  async function removeFunder(f) {
+    const ok = await confirm({
+      title: t('funderDeleted'),
+      body: t('confirmDeleteFunder', { name: f.name }),
+      confirmLabel: t('delete') || 'Delete',
+    })
     if (!ok) return
-    clearMessages()
     try {
-      await mutations.deleteFunder(f.id)
-      setMessage('Funder deleted.')
-    } catch (err) { setLocalError(err.message) }
+      await backend.deleteFunder(f.id)
+      toast.success(t('funderDeleted'))
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
-
-  const filtered = (funders || []).filter((f) =>
-    (f.name || '').toLowerCase().includes(search.trim().toLowerCase()),
-  )
 
   return (
-    <div>
-      <div className="page-head">
-        <h2>Funders (Donors)</h2>
-        <p>Add the names you want to collect donations from every month.</p>
-      </div>
+    <div className="page">
+      <header className="page-head">
+        <div>
+          <h2>{t('fundersTitle')}</h2>
+          <p>{t('fundersSub')}</p>
+        </div>
+        <span className="pill">{t('total', { count: funders.length })}</span>
+      </header>
 
-      {message && <div className="toast success">{message}</div>}
-      {(error || localError) && <div className="toast error">{error || localError}</div>}
+      {error && (
+        <div className="notice error" role="alert">
+          <Icon name="alert" size={16} />
+          <span>{error}</span>
+        </div>
+      )}
 
-      <div className="card">
-        <h3>Add Funder</h3>
+      <section className="card">
+        <h3 className="card-title">{t('addFunder')}</h3>
         <form className="form-row" onSubmit={addFunder}>
-          <input
-            className="grow"
-            placeholder="Funder name *"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <input
-            placeholder="Phone (optional)"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          />
-          <input
-            placeholder="Note (optional)"
-            value={form.note}
-            onChange={(e) => setForm({ ...form, note: e.target.value })}
-          />
+          <label className="field grow">
+            <span>{t('funderName')} *</span>
+            <input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder={t('funderName')}
+              autoComplete="off"
+            />
+          </label>
+          <label className="field">
+            <span>{t('phone')}</span>
+            <input
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              inputMode="tel"
+              autoComplete="off"
+            />
+          </label>
+          <label className="field grow">
+            <span>{t('note')}</span>
+            <input
+              value={form.note}
+              onChange={(e) => setForm({ ...form, note: e.target.value })}
+              autoComplete="off"
+            />
+          </label>
           <button type="submit" className="btn primary" disabled={busy}>
-            {busy ? 'Adding…' : '+ Add'}
+            <Icon name="plus" size={16} />
+            {t('addFunder')}
           </button>
         </form>
-      </div>
+      </section>
 
-      <div className="card">
+      <section className="card">
         <div className="card-head">
-          <h3>Funders List</h3>
-          <span className="pill">{(funders || []).length} total</span>
+          <h3>{t('fundersList')}</h3>
+          <div className="search-box">
+            <Icon name="search" size={16} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('searchFunders')}
+              aria-label={t('searchFunders')}
+            />
+            {search && (
+              <button type="button" className="affix-btn" onClick={() => setSearch('')} aria-label={t('close')}>
+                <Icon name="close" size={14} />
+              </button>
+            )}
+          </div>
         </div>
 
-        <input
-          className="search"
-          placeholder="Search funders…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-
         {loading ? (
-          <p className="muted">Loading…</p>
+          <Skeleton rows={6} />
+        ) : funders.length === 0 ? (
+          <div className="empty">
+            <Icon name="funders" size={26} />
+            <p>{t('noFunders')}</p>
+          </div>
         ) : filtered.length === 0 ? (
-          <p className="muted">No funders found. Add your first funder above.</p>
+          <div className="empty">
+            <Icon name="search" size={26} />
+            <p>{t('noMatches', { query: search })}</p>
+          </div>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Phone</th>
-                  <th>Note</th>
-                  <th className="actions-col">Actions</th>
+                  <th>{t('funderName')}</th>
+                  <th>{t('phone')}</th>
+                  <th>{t('note')}</th>
+                  <th className="actions-col">{t('actions')}</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((f) =>
-                  editingId === f.id ? (
-                    <tr key={f.id} className="editing-row">
-                      <td>
-                        <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-                      </td>
-                      <td>
-                        <input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
-                      </td>
-                      <td>
-                        <input value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
-                      </td>
-                      <td className="actions-col">
-                        <button className="btn small primary" onClick={saveEdit} disabled={busy}>Save</button>
-                        <button className="btn small ghost" onClick={cancelEdit}>Cancel</button>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={f.id}>
-                      <td className="strong">{f.name}</td>
-                      <td>{f.phone || '—'}</td>
-                      <td className="muted">{f.note || '—'}</td>
-                      <td className="actions-col">
-                        <button className="btn small ghost" onClick={() => startEdit(f)}>Edit</button>
-                        <button className="btn small danger" onClick={() => deleteFunder(f)}>Delete</button>
-                      </td>
-                    </tr>
-                  ),
-                )}
+                {filtered.map((f) => (
+                  <FunderRow
+                    key={f.id}
+                    funder={f}
+                    editing={editingId === f.id}
+                    draft={draft}
+                    onChange={(key, value) => setDraft((d) => ({ ...d, [key]: value }))}
+                    onSave={saveEdit}
+                    onCancel={() => setEditingId(null)}
+                    onEdit={() => startEdit(f)}
+                    onDelete={() => removeFunder(f)}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
         )}
-      </div>
+
+        {!loading && funders.length > 0 && (
+          <footer className="card-foot muted">
+            {t('showing', { shown: filtered.length, total: funders.length })}
+          </footer>
+        )}
+      </section>
     </div>
   )
 }

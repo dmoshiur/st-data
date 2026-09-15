@@ -1,0 +1,327 @@
+/**
+ * UI strings. `en` is the source of truth; `bn` must define the same keys
+ * (a unit test in tests/ enforces parity so a new string can never ship
+ * half-translated).
+ *
+ * Interpolation uses {braces}: t('savedDonors', { count: 3 })
+ */
+
+export const LANGUAGES = [
+  { code: 'en', label: 'English', native: 'English', dir: 'ltr' },
+  { code: 'bn', label: 'Bangla', native: 'বাংলা', dir: 'ltr' },
+]
+
+export const en = {
+  // brand
+  appName: 'Sadiq Travels',
+  appTagline: 'Donor & monthly donation ledger',
+  invocation: 'بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+
+  // nav
+  nav_dashboard: 'Dashboard',
+  nav_funders: 'Funders',
+  nav_donations: 'Donations',
+  nav_admins: 'Admins',
+  nav_toggle: 'Toggle navigation',
+  skipToContent: 'Skip to content',
+
+  // auth
+  signIn: 'Sign in',
+  signOut: 'Sign out',
+  signingIn: 'Signing in…',
+  adminSignIn: 'Administrator sign-in',
+  email: 'Email',
+  password: 'Password',
+  emailPlaceholder: 'admin@example.com',
+  passwordPlaceholder: 'Your password',
+  forgotPassword: 'Forgot password?',
+  resetSent: 'Password reset email sent. Check the inbox for {email}.',
+  createFirstAdmin: 'Set up the first administrator',
+  createFirstAdminHint:
+    'No administrators exist in Firebase yet. Create the owner account — it only takes a moment.',
+  firstName: 'Display name (optional)',
+  createAccount: 'Create account',
+  creating: 'Creating…',
+  alreadyHaveAccount: 'Already have an account? Sign in',
+  noAccountYet: 'No account yet? Create the first one',
+
+  // dashboard
+  totalFunders: 'Total funders',
+  totalFundersHint: 'Names on your donor list',
+  thisMonth: 'This month',
+  thisYear: 'This year',
+  allTime: 'All time',
+  collected: 'Collected',
+  monthsWithData: '{count} month(s) with records',
+  entries: '{count} record(s)',
+  monthlyTrend: 'Last 12 months',
+  recentDonations: 'Recent donations',
+  noDonationsYet: 'No donations recorded yet. Open Donations to record the first month.',
+  funder: 'Funder',
+  month: 'Month',
+  amount: 'Amount',
+  saved: 'Saved',
+  never: 'Never',
+
+  // funders
+  fundersTitle: 'Funders (donors)',
+  fundersSub: 'Everyone you collect from each month.',
+  addFunder: 'Add funder',
+  funderName: 'Funder name',
+  phone: 'Phone',
+  note: 'Note',
+  funderNameRequired: 'Funder name is required.',
+  fundersList: 'Funder list',
+  total: '{count} total',
+  showing: 'Showing {shown} of {total}',
+  searchFunders: 'Search funders…',
+  noFunders: 'No funders yet. Add your first funder above.',
+  noMatches: 'Nothing matches “{query}”.',
+  funderAdded: 'Funder added.',
+  funderUpdated: 'Funder updated.',
+  funderDeleted: 'Funder deleted.',
+  confirmDeleteFunder: 'Delete funder “{name}”? Their saved donation rows will be removed too.',
+  actions: 'Actions',
+  edit: 'Edit',
+  delete: 'Delete',
+
+  // donations
+  donationsTitle: 'Monthly donations',
+  donationsSub: 'Pick a month, tick the funders, enter each amount, save.',
+  previousMonth: 'Previous month',
+  nextMonth: 'Next month',
+  goToThisMonth: 'This month',
+  savedThisMonth: 'Saved this month',
+  selected: '{count} selected',
+  selectAll: 'Select all',
+  clearAll: 'Clear',
+  save: 'Save',
+  saving: 'Saving…',
+  savedDonors: 'Saved {count} donor(s) for {month}.',
+  amountBdt: 'Amount (৳)',
+  status: 'Status',
+  statusSaved: 'Saved',
+  statusSelected: 'Selected',
+  statusUnpaid: '—',
+  selectAtLeastOne: 'Tick at least one funder to save.',
+  enterValidAmounts: 'Enter an amount above 0 for every funder you ticked.',
+  confirmRemoveSaved:
+    'Saving will drop {count} previously saved donor(s) from {month}. Continue?',
+  confirmRemoveEntry: 'Remove “{name}” from {month}?',
+  donorRemoved: 'Donor removed.',
+  noFundersForMonth: 'No funders yet — add them on the Funders page first.',
+  applyToSelected: 'Apply to all ticked',
+  bulkAmount: 'Same amount for every ticked funder',
+  orphansTitle: 'Saved rows for deleted funders',
+  orphansHint:
+    'These donors were saved for this month but are no longer on your funder list.',
+  printSheet: 'Print sheet',
+
+  // admins
+  adminsTitle: 'Administrators',
+  adminsSub: 'Who can sign in to this ledger.',
+  addAdmin: 'Add admin',
+  displayName: 'Display name',
+  passwordMin6: 'Password (min 6 characters)',
+  adminAccounts: 'Admin accounts',
+  created: 'Created',
+  lastSignIn: 'Last sign-in',
+  you: 'You',
+  owner: 'Owner',
+  adminAdded: 'Admin added.',
+  adminUpdated: 'Admin updated.',
+  adminRemoved: 'Admin removed.',
+  cannotDeleteSelf: 'You cannot remove your own account.',
+  confirmDeleteAdmin:
+    'Remove “{email}”? They will be signed out and blocked at the next sign-in.',
+  changeMyPassword: 'Change my password',
+  currentPassword: 'Current password',
+  newPassword: 'New password (min 6 characters)',
+  updatePassword: 'Update password',
+  updating: 'Updating…',
+  passwordUpdated: 'Password updated.',
+  sendReset: 'Send reset email',
+  resetNote: 'Reset links are sent by Firebase Authentication.',
+  passwordNote:
+    'Firebase only lets an administrator change their own password from the browser. Use “Send reset email” for anyone else.',
+
+  // shared
+  loading: 'Loading…',
+  close: 'Close',
+  confirm: 'Confirm',
+  cancel: 'Cancel',
+  offline: 'Offline — changes will sync when the connection returns.',
+  online: 'Connected to Firebase',
+  demoMode: 'Demo mode',
+  demoBannerTitle: 'Demo mode — Firebase is not connected',
+  demoBannerBody:
+    'Nothing is being stored in Firebase, so anything you enter stays in this browser only.',
+  demoBannerHow: 'How to connect Firebase',
+  theme: 'Theme',
+  themeLight: 'Light',
+  themeDark: 'Dark',
+  language: 'Language',
+  copyConfig: 'Copy config',
+  copied: 'Copied to clipboard.',
+}
+
+export const bn = {
+  // brand
+  appName: 'সাদিক ট্রাভেলস',
+  appTagline: 'দাতা ও মাসিক দানের হিসাব',
+  invocation: 'بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+
+  // nav
+  nav_dashboard: 'ড্যাশবোর্ড',
+  nav_funders: 'দাতা',
+  nav_donations: 'দান',
+  nav_admins: 'প্রশাসক',
+  nav_toggle: 'মেনু খুলুন/বন্ধ করুন',
+  skipToContent: 'মূল অংশে যান',
+
+  // auth
+  signIn: 'সাইন ইন',
+  signOut: 'সাইন আউট',
+  signingIn: 'সাইন ইন হচ্ছে…',
+  adminSignIn: 'প্রশাসক সাইন ইন',
+  email: 'ইমেইল',
+  password: 'পাসওয়ার্ড',
+  emailPlaceholder: 'admin@example.com',
+  passwordPlaceholder: 'আপনার পাসওয়ার্ড',
+  forgotPassword: 'পাসওয়ার্ড ভুলে গেছেন?',
+  resetSent: 'পাসওয়ার্ড রিসেট ইমেইল পাঠানো হয়েছে। {email} এর ইনবক্স দেখুন।',
+  createFirstAdmin: 'প্রথম প্রশাসক তৈরি করুন',
+  createFirstAdminHint:
+    'Firebase-এ এখনো কোনো প্রশাসক নেই। মালিক অ্যাকাউন্ট তৈরি করুন — মাত্র কয়েক সেকেন্ড লাগবে।',
+  firstName: 'প্রদর্শন নাম (ঐচ্ছিক)',
+  createAccount: 'অ্যাকাউন্ট তৈরি করুন',
+  creating: 'তৈরি হচ্ছে…',
+  alreadyHaveAccount: 'অ্যাকাউন্ট আছে? সাইন ইন করুন',
+  noAccountYet: 'অ্যাকাউন্ট নেই? প্রথমটি তৈরি করুন',
+
+  // dashboard
+  totalFunders: 'মোট দাতা',
+  totalFundersHint: 'আপনার তালিকায় থাকা নাম',
+  thisMonth: 'এই মাস',
+  thisYear: 'এই বছর',
+  allTime: 'সর্বমোট',
+  collected: 'সংগৃহীত',
+  monthsWithData: '{count} মাসে রেকর্ড আছে',
+  entries: '{count}টি রেকর্ড',
+  monthlyTrend: 'গত ১২ মাস',
+  recentDonations: 'সাম্প্রতিক দান',
+  noDonationsYet: 'এখনো কোনো দান যুক্ত হয়নি। প্রথম মাসটি যুক্ত করতে “দান” পেজে যান।',
+  funder: 'দাতা',
+  month: 'মাস',
+  amount: 'পরিমাণ',
+  saved: 'সংরক্ষিত',
+  never: 'কখনো না',
+
+  // funders
+  fundersTitle: 'দাতা (দানকারী)',
+  fundersSub: 'যাদের কাছ থেকে প্রতি মাসে সংগ্রহ করা হয়।',
+  addFunder: 'দাতা যোগ করুন',
+  funderName: 'দাতার নাম',
+  phone: 'ফোন',
+  note: 'নোট',
+  funderNameRequired: 'দাতার নাম দিতে হবে।',
+  fundersList: 'দাতার তালিকা',
+  total: 'সর্বমোট {count}',
+  showing: '{total} এর মধ্যে {shown} দেখানো হচ্ছে',
+  searchFunders: 'দাতা খুঁজুন…',
+  noFunders: 'এখনো কোনো দাতা নেই। উপরে প্রথম দাতা যোগ করুন।',
+  noMatches: '“{query}” এর সাথে কিছু মেলেনি।',
+  funderAdded: 'দাতা যোগ হয়েছে।',
+  funderUpdated: 'দাতার তথ্য হালনাগাদ হয়েছে।',
+  funderDeleted: 'দাতা মুছে ফেলা হয়েছে।',
+  confirmDeleteFunder: '“{name}” মুছে ফেলবেন? তাঁর সংরক্ষিত দানের সারিও মুছে যাবে।',
+  actions: 'কর্ম',
+  edit: 'সম্পাদনা',
+  delete: 'মুছুন',
+
+  // donations
+  donationsTitle: 'মাসিক দান',
+  donationsSub: 'মাস বেছে নিন, দাতা নির্বাচন করুন, পরিমাণ লিখে সংরক্ষণ করুন।',
+  previousMonth: 'পূর্ববর্তী মাস',
+  nextMonth: 'পরবর্তী মাস',
+  goToThisMonth: 'এই মাস',
+  savedThisMonth: 'এই মাসে সংরক্ষিত',
+  selected: '{count} নির্বাচিত',
+  selectAll: 'সব নির্বাচন',
+  clearAll: 'মুছুন',
+  save: 'সংরক্ষণ',
+  saving: 'সংরক্ষণ হচ্ছে…',
+  savedDonors: '{month} মাসের জন্য {count} জন দাতা সংরক্ষিত হয়েছে।',
+  amountBdt: 'পরিমাণ (৳)',
+  status: 'অবস্থা',
+  statusSaved: 'সংরক্ষিত',
+  statusSelected: 'নির্বাচিত',
+  statusUnpaid: '—',
+  selectAtLeastOne: 'সংরক্ষণের জন্য কমপক্ষে একজন দাতা নির্বাচন করুন।',
+  enterValidAmounts: 'নির্বাচিত প্রতিটি দাতার জন্য ০-এর বেশি পরিমাণ লিখুন।',
+  confirmRemoveSaved:
+    'সংরক্ষণ করলে {month} মাসের আগে সংরক্ষিত {count} জন দাতা বাদ পড়বে। চালিয়ে যাবেন?',
+  confirmRemoveEntry: '“{name}” কে {month} থেকে সরিয়ে ফেলবেন?',
+  donorRemoved: 'দাতা সরানো হয়েছে।',
+  noFundersForMonth: 'এখনো কোনো দাতা নেই — আগে “দাতা” পেজে যোগ করুন।',
+  applyToSelected: 'সব নির্বাচিতের জন্য প্রয়োগ',
+  bulkAmount: 'প্রতিটি নির্বাচিত দাতার জন্য একই পরিমাণ',
+  orphansTitle: 'মুছে ফেলা দাতাদের সংরক্ষিত সারি',
+  orphansHint: 'এই দাতারা এই মাসে সংরক্ষিত ছিলেন কিন্তু এখন তালিকায় নেই।',
+  printSheet: 'শিট প্রিন্ট',
+
+  // admins
+  adminsTitle: 'প্রশাসক',
+  adminsSub: 'যারা এই হিসাবে সাইন ইন করতে পারবেন।',
+  addAdmin: 'প্রশাসক যোগ করুন',
+  displayName: 'প্রদর্শন নাম',
+  passwordMin6: 'পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)',
+  adminAccounts: 'প্রশাসক অ্যাকাউন্ট',
+  created: 'তৈরি',
+  lastSignIn: 'সর্বশেষ সাইন ইন',
+  you: 'আপনি',
+  owner: 'মালিক',
+  adminAdded: 'প্রশাসক যোগ হয়েছে।',
+  adminUpdated: 'প্রশাসকের তথ্য হালনাগাদ হয়েছে।',
+  adminRemoved: 'প্রশাসক সরানো হয়েছে।',
+  cannotDeleteSelf: 'নিজের অ্যাকাউন্ট নিজে সরাতে পারবেন না।',
+  confirmDeleteAdmin: '“{email}” কে সরিয়ে ফেলবেন? পরবর্তী সাইন ইনে বাধা পাবেন।',
+  changeMyPassword: 'আমার পাসওয়ার্ড পরিবর্তন',
+  currentPassword: 'বর্তমান পাসওয়ার্ড',
+  newPassword: 'নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)',
+  updatePassword: 'পাসওয়ার্ড হালনাগাদ',
+  updating: 'হালনাগাদ হচ্ছে…',
+  passwordUpdated: 'পাসওয়ার্ড হালনাগাদ হয়েছে।',
+  sendReset: 'রিসেট ইমেইল পাঠান',
+  resetNote: 'রিসেট লিংক Firebase Authentication পাঠায়।',
+  passwordNote:
+    'ব্রাউজার থেকে একজন প্রশাসক শুধু নিজের পাসওয়ার্ডই বদলাতে পারেন। অন্যদের জন্য “রিসেট ইমেইল পাঠান” ব্যবহার করুন।',
+
+  // shared
+  loading: 'লোড হচ্ছে…',
+  close: 'বন্ধ',
+  confirm: 'নিশ্চিত',
+  cancel: 'বাতিল',
+  offline: 'অফলাইন — সংযোগ ফিরলে পরিবর্তনগুলো সিঙ্ক হবে।',
+  online: 'Firebase-এর সাথে সংযুক্ত',
+  demoMode: 'ডেমো মোড',
+  demoBannerTitle: 'ডেমো মোড — Firebase সংযুক্ত নয়',
+  demoBannerBody: 'কিছুই Firebase-এ সংরক্ষিত হচ্ছে না, সব তথ্য শুধু এই ব্রাউজারে থাকবে।',
+  demoBannerHow: 'Firebase সংযোগের নিয়ম',
+  theme: 'থিম',
+  themeLight: 'লাইট',
+  themeDark: 'ডার্ক',
+  language: 'ভাষা',
+  copyConfig: 'কনফিগ কপি',
+  copied: 'ক্লিপবোর্ডে কপি হয়েছে।',
+}
+
+export const dictionaries = { en, bn }
+
+/** Fill "{name}" placeholders. */
+export function interpolate(template, vars) {
+  if (!vars || typeof template !== 'string') return template
+  return template.replace(/\{(\w+)\}/g, (match, key) =>
+    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : match,
+  )
+}

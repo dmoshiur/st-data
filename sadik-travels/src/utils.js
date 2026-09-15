@@ -1,44 +1,35 @@
-export const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]
+/**
+ * Formatting + calendar helpers. Everything here is pure so it can be reused
+ * in tests and in the print stylesheet.
+ */
+import { MONTH_NAMES, monthKey, monthLabel, parseMonthKey, shiftMonthKey } from './store/totals.js'
 
-/** "2026" + "9" -> "2026-09" (used as the Realtime DB key for a month) */
-export const monthKey = (year, month /* 1..12 */) =>
-  `${year}-${String(month).padStart(2, '0')}`
+export const MONTHS = MONTH_NAMES
+
+export { MONTH_NAMES, monthKey, monthLabel, parseMonthKey, shiftMonthKey }
 
 /** 1234567 -> "1,234,567" */
 export const formatNumber = (n) => (Number(n) || 0).toLocaleString('en-US')
 
-/** Always render currency in English locale. */
-export const formatCurrency = (n) => formatNumber(n)
+const BN_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯']
 
-export const formatDate = (ts) => {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
+/** Swap ASCII digits for Bengali digits (used when the UI language is বাংলা). */
+export function toBengaliDigits(value) {
+  return String(value).replace(/\d/g, (d) => BN_DIGITS[Number(d)])
 }
 
-export const formatDateTime = (ts) => {
+export const formatDate = (ts, locale = 'en-US') => {
   if (!ts) return '—'
   const d = new Date(ts)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('en-US', {
+  return d.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+export const formatDateTime = (ts, locale = 'en-US') => {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString(locale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -47,10 +38,16 @@ export const formatDateTime = (ts) => {
   })
 }
 
-/** Generate a list of years around the current year (for the month picker). */
+/** Years around today, for the month picker. */
 export const yearRange = (span = 6) => {
   const now = new Date().getFullYear()
   const years = []
   for (let y = now - span; y <= now + 2; y++) years.push(y)
   return years
+}
+
+/** Current month as "YYYY-MM". */
+export const currentMonthKey = () => {
+  const d = new Date()
+  return monthKey(d.getFullYear(), d.getMonth() + 1)
 }
